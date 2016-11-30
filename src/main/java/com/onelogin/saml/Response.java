@@ -81,7 +81,7 @@ public class Response {
 	}
 
 	// isValid() function should be called to make basic security checks to responses.
-	public boolean isValid(String... requestId){
+	public boolean isValid(boolean validateTimestamp){
 		try{
 			Calendar now = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 			
@@ -123,7 +123,7 @@ public class Response {
 				}
 			}
 
-			/*
+			/* Don't validate XML
 			Document res = Utils.validateXML(this.document, "saml-schema-protocol-2.0.xsd");
 
 			if(!(res instanceof Document)){
@@ -131,16 +131,18 @@ public class Response {
 			}
 			*/
 
+			/*
 			if (rootElement.hasAttribute("InResponseTo")) {
 				String responseInResponseTo = document.getDocumentElement().getAttribute("InResponseTo");
 				if(requestId.length > 0 && responseInResponseTo.compareTo(requestId[0]) != 0){
 					throw new Exception("The InResponseTo of the Response: "+ responseInResponseTo + ", does not match the ID of the AuthNRequest sent by the SP: "+ requestId[0]);
 				}
 			}
+			*/
 
 			// Validate Assertion timestamps
-			if (!this.validateTimestamps()) {
-				// throw new Exception("Timing issues. Possible reasons include: SAML expired, service's clock setting is not UTC.");
+			if (validateTimestamp && !this.validateTimestamps()) {
+				throw new Exception("Timing issues. Possible reasons include: SAML expired, service's clock setting is not UTC.");
 			}
 
 			// EncryptedAttributes are not supported
@@ -203,25 +205,25 @@ public class Response {
 						}
 
 						Node notOnOrAfter = subjectConfirmationDataNodes.item(c).getAttributes().getNamedItem("NotOnOrAfter");					
-						if(notOnOrAfter != null){
+						if(notOnOrAfter != null && validateTimestamp){
 							Calendar noa = javax.xml.bind.DatatypeConverter.parseDateTime(notOnOrAfter.getNodeValue());
 							if(now.equals(noa) || now.after(noa)){
-								// validSubjectConfirmation = false;
+								validSubjectConfirmation = false;
 							}
 						}
 
 						Node notBefore = subjectConfirmationDataNodes.item(c).getAttributes().getNamedItem("NotBefore");					
-						if(notBefore != null){
+						if(notBefore != null && validateTimestamp){
 							Calendar nb = javax.xml.bind.DatatypeConverter.parseDateTime(notBefore.getNodeValue());
 							if(now.before(nb)){
-								// validSubjectConfirmation = false;
+								validSubjectConfirmation = false;
 							}
 						}			
 					}
 				}
 			}
 			if (!validSubjectConfirmation) {
-				throw new Exception("A valid SubjectConfirmation was not found on this Response");
+				throw new Exception("A valid SubjectConfirmation was not found on this SAML Response");
 			}
 
 			if(signedElements.isEmpty()){
